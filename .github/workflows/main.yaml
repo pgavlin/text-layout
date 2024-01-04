@@ -34,4 +34,6 @@ jobs:
     - name: Run tests
       run: |
         cargo test
+        cargo test --no-default-features --features libm
         cargo test --examples
+        cargo test --examples --no-default-features --features libm

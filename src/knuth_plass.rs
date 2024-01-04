@@ -2,39 +2,39 @@ extern crate alloc;
 use alloc::{vec, vec::Vec};
 use bumpalo::Bump;
 
-use crate::{Item, Line, ParagraphLayout};
 use crate::math::Num;
+use crate::{Item, Line, ParagraphLayout};
 
 /// Runs the Kunth-Plass line-breaking algorithm to calculate the optimal break points for a
 /// paragraph.
-pub struct KnuthPlass {
-    flagged_demerit: f32,
-    fitness_demerit: f32,
-    threshold: f32,
+pub struct KnuthPlass<N> {
+    flagged_demerit: N,
+    fitness_demerit: N,
+    threshold: N,
     looseness: usize,
 }
 
-impl KnuthPlass {
+impl<N: Num> KnuthPlass<N> {
     /// Creates a new with default parameter values.
     pub fn new() -> Self {
         KnuthPlass {
-            flagged_demerit: 100.0,
-            fitness_demerit: 100.0,
-            threshold: 1.0,
+            flagged_demerit: N::from(100),
+            fitness_demerit: N::from(100),
+            threshold: N::from(1),
             looseness: 0,
         }
     }
 
     /// Sets the demerit for flagged penalties. Defaults to 100. Referred to as 𝛂 in Kunth-Plass
     /// '81.
-    pub fn with_flagged_demerit(mut self, flagged_demerit: f32) -> Self {
+    pub fn with_flagged_demerit(mut self, flagged_demerit: N) -> Self {
         self.flagged_demerit = flagged_demerit;
         self
     }
 
     /// Sets the demerit for a line that belongs to a different fitness class than its predecessor.
     /// Defaults to 100. Referred to as 𝛄 in Knuth-Plass '81.
-    pub fn with_fitness_demerit(mut self, fitness_demerit: f32) -> Self {
+    pub fn with_fitness_demerit(mut self, fitness_demerit: N) -> Self {
         self.fitness_demerit = fitness_demerit;
         self
     }
@@ -42,7 +42,7 @@ impl KnuthPlass {
     /// Sets the adjustment ratio threshold. Lines will not be allowed to break at a given point if
     /// doing so would cause the line's adjustment ratio to exceed this value. Referred to as 𝛒 in
     /// Knuth-Plass '81.
-    pub fn with_threshold(mut self, threshold: f32) -> Self {
+    pub fn with_threshold(mut self, threshold: N) -> Self {
         self.threshold = threshold;
         self
     }
@@ -56,14 +56,14 @@ impl KnuthPlass {
     }
 }
 
-impl Default for KnuthPlass {
+impl<N: Num> Default for KnuthPlass<N> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ParagraphLayout for KnuthPlass {
-    fn layout_paragraph(&self, items: &[Item], line_width: f32) -> Vec<Line> {
+impl<N: Num> ParagraphLayout<N> for KnuthPlass<N> {
+    fn layout_paragraph(&self, items: &[Item<N>], line_width: N) -> Vec<Line<N>> {
         let layout = KnuthPlassLayout {
             bump: Bump::new(),
             items,
@@ -73,9 +73,9 @@ impl ParagraphLayout for KnuthPlass {
             threshold: self.threshold,
             looseness: self.looseness,
             first_uniform_line: 0,
-            total_width: 0.0,
-            total_stretch: 0.0,
-            total_shrink: 0.0,
+            total_width: N::from(0),
+            total_stretch: N::from(0),
+            total_shrink: N::from(0),
             active: None,
         };
         unsafe { layout.run() }
@@ -84,27 +84,27 @@ impl ParagraphLayout for KnuthPlass {
 
 /// Calculates the adjustment ratio for a break at the given item. Width, stretch, and shrink
 /// are for the line that ends at the break.
-fn adjustment_ratio(at: &Item, width: f32, stretch: f32, shrink: f32, line_width: f32) -> f32 {
+fn adjustment_ratio<N: Num>(at: &Item<N>, width: N, stretch: N, shrink: N, line_width: N) -> N {
     let penalty_width = if let Item::Penalty { width, .. } = at {
         *width
     } else {
-        0.0
+        N::from(0)
     };
     let width = width + penalty_width;
     if width < line_width {
-        if stretch > 0.0 {
+        if stretch > N::from(0) {
             (line_width - width) / stretch
         } else {
-            f32::INFINITY
+            N::INFINITY
         }
     } else if width > line_width {
-        if shrink > 0.0 {
+        if shrink > N::from(0) {
             (line_width - width) / shrink
         } else {
-            f32::INFINITY
+            N::INFINITY
         }
     } else {
-        0.0
+        N::from(0)
     }
 }
 
@@ -125,7 +125,7 @@ impl Fitness {
 
 /// A Node tracks a feasible line break.
 #[derive(Default)]
-struct Node {
+struct Node<N> {
     /// The position of the line break within the paragraph.
     position: usize,
     /// The index of the line that terminates at this break.
@@ -133,17 +133,17 @@ struct Node {
     /// The break's fitness class.
     fitness: Fitness,
     /// 𝚺𝓌 after position per Knuth-Plass '81.
-    total_width: f32,
+    total_width: N,
     /// 𝚺𝓎 after position per Knuth-Plass '81.
-    total_stretch: f32,
+    total_stretch: N,
     /// 𝚺𝓏 after position per Knuth-Plass '81.
-    total_shrink: f32,
+    total_shrink: N,
     /// Minimum total demerits up to this break point.
-    total_demerits: f32,
+    total_demerits: N,
     /// Pointer to the best node for the preceeding break point.
-    previous: Option<*mut Node>,
+    previous: Option<*mut Node<N>>,
     /// Pointer to the next active node.
-    link: Option<*mut Node>,
+    link: Option<*mut Node<N>>,
 }
 
 /// Holder for the state used by Knuth-Plass. Tracks various configuration parameters plus the
@@ -151,21 +151,21 @@ struct Node {
 ///
 /// Active nodes are allocated using a bump allocator and deallocated en masse once the algorithm
 /// terminates.
-struct KnuthPlassLayout<'a> {
+struct KnuthPlassLayout<'a, N> {
     /// Allocator for break nodes.
     bump: Bump,
 
     /// The paragraph's items.
-    items: &'a [Item],
+    items: &'a [Item<N>],
     /// The line width parameter.
-    line_width: f32,
+    line_width: N,
 
     /// Demerit for flagged penalties. Referred to as 𝛂 in Kunth-Plass '81.
-    flagged_demerit: f32,
+    flagged_demerit: N,
     /// Demerit for differing fitness classes. Referred to as 𝛄 in Knuth-Plass '81.
-    fitness_demerit: f32,
+    fitness_demerit: N,
     /// Adjustment ratio threshold.  Referred to as 𝛒 in Knuth-Plass '81.
-    threshold: f32,
+    threshold: N,
     /// Looseness parameter. Referred to as 𝗾 in Kunth-Plass '81.
     looseness: usize,
     /// Index of the first line that begins a block of uniformly-long lines that extends to the end
@@ -173,35 +173,32 @@ struct KnuthPlassLayout<'a> {
     first_uniform_line: usize,
 
     /// Total width of all items in the paragraph up to the current item.
-    total_width: f32,
+    total_width: N,
     /// Total stretch of all items in the paragraph up to the current item.
-    total_stretch: f32,
+    total_stretch: N,
     /// Total shrink of all items in the paragraph up to the current item.
-    total_shrink: f32,
+    total_shrink: N,
     /// Head of the linked list of active nodes.
-    active: Option<*mut Node>,
+    active: Option<*mut Node<N>>,
 }
 
-impl<'a> KnuthPlassLayout<'a> {
+impl<'a, N: Num> KnuthPlassLayout<'a, N> {
     /// Creates a new node for a breakpoint. Currently just a wrapper for bump.alloc.
-    fn new_node(
-        &mut self,
-        node: Node,
-    ) -> *mut Node {
+    fn new_node(&mut self, node: Node<N>) -> *mut Node<N> {
         self.bump.alloc(node)
     }
 
     /// Placeholder method for determining the width of a given line. Currently just returns
     /// line_width.
-    fn get_line_width(&self, _l: usize) -> f32 {
+    fn get_line_width(&self, _l: usize) -> N {
         self.line_width
     }
 
     /// Returns the width, stretch, and shrink of the node at b and indicates whether or not b is a
     /// legal break.
-    fn is_legal_breakpoint(&self, b: usize) -> (f32, f32, f32, bool) {
+    fn is_legal_breakpoint(&self, b: usize) -> (N, N, N, bool) {
         match self.items[b] {
-            Item::Box { width } => (width, 0.0, 0.0, false),
+            Item::Box { width } => (width, N::from(0), N::from(0), false),
             Item::Glue {
                 width,
                 stretch,
@@ -212,12 +209,14 @@ impl<'a> KnuthPlassLayout<'a> {
                 shrink,
                 matches!(self.items[b - 1], Item::Box { .. }),
             ),
-            Item::Penalty { width, cost, .. } => (width, 0.0, 0.0, cost != f32::INFINITY),
+            Item::Penalty { width, cost, .. } => {
+                (width, N::from(0), N::from(0), cost != N::INFINITY)
+            }
         }
     }
 
     /// Calculates the line number and adjustment ratio for a line from the end of a to b.
-    fn adjustment_ratio(&self, a: &Node, b: usize) -> (usize, f32) {
+    fn adjustment_ratio(&self, a: &Node<N>, b: usize) -> (usize, N) {
         let j = a.line + 1;
         let r = adjustment_ratio(
             &self.items[b],
@@ -230,7 +229,7 @@ impl<'a> KnuthPlassLayout<'a> {
     }
 
     /// Deactivates the given node by removing it from the active list.
-    unsafe fn deactivate_node(&mut self, a: &mut Node) {
+    unsafe fn deactivate_node(&mut self, a: &mut Node<N>) {
         if let Some(previous) = a.previous {
             (*previous).link = a.link;
         }
@@ -240,24 +239,24 @@ impl<'a> KnuthPlassLayout<'a> {
     }
 
     /// Calculates the demerits and fitness class for a line from a to b.
-    unsafe fn demerits_and_fitness(&self, r: f32, a: &Node, b: usize) -> (f32, Fitness) {
+    unsafe fn demerits_and_fitness(&self, r: N, a: &Node<N>, b: usize) -> (N, Fitness) {
         let cost = self.items[b].penalty_cost();
-        let d = if cost >= 0.0 {
-            (1.0 + 100.0 * r.abs().pow(3.0) + cost).pow(2.0)
-        } else if cost != f32::NEG_INFINITY {
-            (1.0 + 100.0 * r.abs().pow(3.0)).pow(2.0) - cost.pow(2.0)
+        let d = if cost >= N::from(0) {
+            (N::from(1) + N::from(100) * r.abs().powi(3) + cost).powi(2)
+        } else if cost != N::NEG_INFINITY {
+            (N::from(1) + N::from(100) * r.abs().powi(3)).powi(2) - cost.powi(2)
         } else {
-            (1.0 + 100.0 * r.abs().pow(3.0)).pow(2.0)
+            (N::from(1) + N::from(100) * r.abs().powi(3)).powi(2)
         };
         let d = d + self.flagged_demerit
             * self.items[b].penalty_flag()
             * self.items[a.position].penalty_flag();
 
-        let c = if r < -0.5 {
+        let c = if r < N::rat(-1, 2) {
             Fitness::Zero
-        } else if r <= 0.5 {
+        } else if r <= N::rat(1, 2) {
             Fitness::One
-        } else if r <= 1.0 {
+        } else if r <= N::from(1) {
             Fitness::Two
         } else {
             Fitness::Three
@@ -272,7 +271,7 @@ impl<'a> KnuthPlassLayout<'a> {
     }
 
     /// Calculates 𝚺𝓌 after b, 𝚺𝓎 after b, and 𝚺𝓏 after b per Knuth-Plass '81.
-    fn total_after(&self, b: usize) -> (f32, f32, f32) {
+    fn total_after(&self, b: usize) -> (N, N, N) {
         let (mut total_width, mut total_stretch, mut total_shrink) =
             (self.total_width, self.total_stretch, self.total_shrink);
         for i in b..self.items.len() {
@@ -288,7 +287,7 @@ impl<'a> KnuthPlassLayout<'a> {
                     total_shrink += shrink;
                 }
                 Item::Penalty { cost, .. } => {
-                    if cost == f32::NEG_INFINITY && i > b {
+                    if cost == N::NEG_INFINITY && i > b {
                         break;
                     }
                 }
@@ -302,21 +301,20 @@ impl<'a> KnuthPlassLayout<'a> {
         let mut a = self.active;
         let mut prev_a = None;
         while a.is_some() {
-            let mut class_a: [Option<*mut Node>; 4] = [None, None, None, None];
-            let mut class_demerits: [f32; 4] =
-                [f32::INFINITY, f32::INFINITY, f32::INFINITY, f32::INFINITY];
-            let mut min_demerits: f32 = f32::INFINITY;
+            let mut class_a: [Option<*mut Node<N>>; 4] = [None, None, None, None];
+            let mut class_demerits: [N; 4] = [N::INFINITY, N::INFINITY, N::INFINITY, N::INFINITY];
+            let mut min_demerits: N = N::INFINITY;
             loop {
                 let unwrapped_a = &mut *a.unwrap();
                 let next_a = unwrapped_a.link;
 
                 let (j, r) = self.adjustment_ratio(unwrapped_a, b);
-                if r < -1.0 || self.items[b].is_mandatory_break() {
+                if r < N::from(-1) || self.items[b].is_mandatory_break() {
                     self.deactivate_node(unwrapped_a);
                 } else {
                     prev_a = a;
                 }
-                if -1.0 <= r && r <= self.threshold {
+                if N::from(-1) <= r && r <= self.threshold {
                     let (demerits, fitness) = self.demerits_and_fitness(r, unwrapped_a, b);
                     if demerits < class_demerits[fitness as usize] {
                         class_demerits[fitness as usize] = demerits;
@@ -337,7 +335,7 @@ impl<'a> KnuthPlassLayout<'a> {
                     }
                 };
             }
-            if min_demerits < f32::INFINITY {
+            if min_demerits < N::INFINITY {
                 let (total_width, total_stretch, total_shrink) = self.total_after(b);
                 let min_demerits = min_demerits + self.fitness_demerit;
                 for c in [Fitness::Zero, Fitness::One, Fitness::Two, Fitness::Three] {
@@ -368,7 +366,7 @@ impl<'a> KnuthPlassLayout<'a> {
     }
 
     /// Driver for Knuth-Plass paragraph layout.
-    unsafe fn run(mut self) -> Vec<Line> {
+    unsafe fn run(mut self) -> Vec<Line<N>> {
         // Initialize the list of active nodes.
         self.active = Some(self.new_node(Default::default()));
 

@@ -1,53 +1,40 @@
-## text-layout
+extern crate fixed;
+extern crate text_layout;
 
-`text-layout` provides algorithms for laying out text prior to rendering.
+use fixed::types::I16F16;
+use std::fmt::{self, Write};
+use text_layout::{Fixed, Item, KnuthPlass, ParagraphLayout};
 
-[![Crates.io][crates-badge]][crates-url]
-[![Docs.rs][docs-badge]][docs-url]
-[![Apache licensed][apache-badge]][apache-url]
+type F = Fixed<I16F16>;
 
-[crates-badge]: https://img.shields.io/crates/v/text-layout.svg
-[crates-url]: https://crates.io/crates/text-layout
-[docs-badge]: https://docs.rs/text-layout/badge.svg
-[docs-url]: https://docs.rs/text-layout
-[apache-badge]: https://img.shields.io/badge/license-Apache--2.0-blue.svg
-[apache-url]: LICENSE
-
-## Features
-
-- `no_std` support for constrained environments
-
-## Usage
-
-Laying out a paragraph for display in a terminal:
-
-```rust
-fn layout_paragraph<'a, P: ParagraphLayout>(
+fn layout_paragraph<'a, P: ParagraphLayout<F>>(
     paragraph: &'a str,
     layout: &P,
-    max_width: usize,
+    max_width: F,
 ) -> Vec<&'a str> {
     // Process the paragraph into its items.
     let mut items = Vec::new();
     for c in paragraph.chars() {
         items.push(if c.is_whitespace() && items.len() != 0 {
             Item::Glue {
-                width: 1.0,
-                stretch: 1.0,
-                shrink: 0.0,
+                width: F::from_num(1),
+                stretch: F::from_num(1),
+                shrink: F::from_num(0),
             }
         } else {
-            Item::Box { width: 1.0 }
+            Item::Box {
+                width: F::from_num(1),
+            }
         });
     }
     items.push(Item::Penalty {
-        width: 0.0,
-        cost: f32::NEG_INFINITY,
+        width: F::from_num(0),
+        cost: F::MIN,
         flagged: true,
     });
 
     // Calculate the paragraph's breaks.
-    let breaks = layout.layout_paragraph(&items, max_width as f32);
+    let breaks = layout.layout_paragraph(&items, max_width);
 
     // Render the laid-out paragraph using the break positions.
     let mut cursor = 0;
@@ -66,8 +53,8 @@ fn layout_paragraph<'a, P: ParagraphLayout>(
 
 fn layout_text() -> Result<String, fmt::Error> {
     let text = "  Far out in the uncharted backwaters of the unfashionable end of the western spiral arm of the Galaxy lies a small unregarded yellow sun. Orbiting this at a distance of roughly ninety-two million miles is an utterly insignificant little blue-green planet whose ape-descended life forms are so amazingly primitive that they still think digital watches are a pretty neat idea.";
-    let knuth_plass = KnuthPlass::new().with_threshold(f32::INFINITY);
-    let lines = layout_paragraph(&text, &knuth_plass, 80);
+    let knuth_plass = KnuthPlass::new().with_threshold(F::MAX);
+    let lines = layout_paragraph(&text, &knuth_plass, F::from_num(80));
     let mut result = String::new();
     writeln!(&mut result, "┏{}┓", "━".repeat(80))?;
     for l in lines {
@@ -82,16 +69,22 @@ fn main() -> Result<(), fmt::Error> {
     print!("{}", layout_text()?);
     Ok(())
 }
-```
 
-This prints:
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-```console
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+    #[test]
+    fn fixed() {
+        let expected = r#"┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃  Far out in the uncharted backwaters of the unfashionable end of the western   ┃
 ┃spiral arm of the Galaxy lies a small unregarded yellow sun. Orbiting this      ┃
 ┃at a distance of roughly ninety-two million miles is an utterly insignificant   ┃
 ┃little blue-green planet whose ape-descended life forms are so amazingly        ┃
 ┃primitive that they still think digital watches are a pretty neat idea.         ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-```
+"#;
+        let actual = layout_text().unwrap();
+        assert!(actual == expected);
+    }
+}

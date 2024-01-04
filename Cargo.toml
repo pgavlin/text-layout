@@ -13,6 +13,7 @@ readme = "README.md"
 
 [dependencies]
 bumpalo = "3.14.0"
+fixed = "1.24.0"
 libm = { version = "0.2.8", optional = true }
 
 [features]

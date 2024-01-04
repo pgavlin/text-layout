@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(not(any(feature = "std", feature = "libm")))]
-compile_error! { "Either the std or libm feature must be enabled" }
+#[cfg(not(any(feature = "std", feature = "fixed", feature = "libm")))]
+compile_error! { "Either the std, fixed, or libm feature must be enabled" }
 
 extern crate alloc;
 use alloc::vec::Vec;
@@ -10,65 +10,66 @@ mod knuth_plass;
 pub use knuth_plass::*;
 
 mod math;
+pub use math::{Fixed, Num};
 
 /// A single item in a paragraph.
 #[derive(Debug)]
-pub enum Item {
+pub enum Item<N = f32> {
     /// An unbreakable box containing paragraph content. Typically represents a glyph or sequence
     /// of glyphs. Lines may not be broken at boxes.
     Box {
         /// The width of the box.
-        width: f32,
+        width: N,
     },
     /// Whitespace that separates boxes. Lines may be broken at glue items.
     Glue {
         /// The normal width of the whitespace.
-        width: f32,
+        width: N,
         /// The stretch parameter. If this item needs to be stretched in order to lay out a line,
         /// the stretch amount will be proportional to this value.
-        stretch: f32,
+        stretch: N,
         /// The shrink parameter. If this item needs to be shrunk in order to lay out a line, the
         /// shrink amount will be proportional to this value.
-        shrink: f32,
+        shrink: N,
     },
     /// A penalty item. Represents a possible breakpoint with a particular aesthetic cost that
     /// indicates the desirability or undesirability of such a breakpoint.
     Penalty {
         /// The width of the penalty item.
-        width: f32,
+        width: N,
         /// The aesthetic cost of the penalty item. A high cost is a relatively undesirable
         /// breakpoint, while a low cost indicates a relatively desirable breakpoint.
-        cost: f32,
+        cost: N,
         /// Whether or not this is a flagged penalty item. Some algorithms will attempt to avoid
         /// having multiple consecutive breaks at flagged penalty items.
         flagged: bool,
     },
 }
 
-impl Item {
-    fn penalty_cost(&self) -> f32 {
+impl<N: Num> Item<N> {
+    fn penalty_cost(&self) -> N {
         match self {
             Item::Penalty { cost, .. } => *cost,
-            _ => 0.0,
+            _ => N::from(0i16),
         }
     }
 
-    fn penalty_flag(&self) -> f32 {
+    fn penalty_flag(&self) -> N {
         match self {
             Item::Penalty { flagged, .. } => {
                 if *flagged {
-                    1.0
+                    N::from(1i16)
                 } else {
-                    0.0
+                    N::from(0i16)
                 }
             }
-            _ => 0.0,
+            _ => N::from(0i16),
         }
     }
 
     fn is_mandatory_break(&self) -> bool {
         match self {
-            Item::Penalty { cost, .. } => *cost == f32::NEG_INFINITY,
+            Item::Penalty { cost, .. } => *cost == N::NEG_INFINITY,
             _ => false,
         }
     }
@@ -76,22 +77,22 @@ impl Item {
 
 /// A single line of text as represented by its break point and adjustment ratio.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Line {
+pub struct Line<N: Num = f32> {
     /// The index of the item at which to break this line.
     pub break_at: usize,
     /// The adjustment ratio that should be applied to glue when rendering this line. If the
     /// adjustment ratio is negative, glue should be adjusted by its shrink parameter. If the
     /// adjustment ratio is positive, glue should be adjusted by its stretch parameter. In general,
-    pub adjustment_ratio: f32,
+    pub adjustment_ratio: N,
 }
 
-impl Line {
+impl<N: Num> Line<N> {
     /// Returns the width of a glue item with the given width, stretch, and shrink once the
     /// adjustment ratio is taken into account.
-    pub fn glue_width(&self, width: f32, stretch: f32, shrink: f32) -> f32 {
-        if self.adjustment_ratio < 0.0 {
+    pub fn glue_width(&self, width: N, stretch: N, shrink: N) -> N {
+        if self.adjustment_ratio < N::from(0i16) {
             width + shrink * self.adjustment_ratio
-        } else if self.adjustment_ratio > 0.0 {
+        } else if self.adjustment_ratio > N::from(0i16) {
             width + stretch * self.adjustment_ratio
         } else {
             width
@@ -100,8 +101,8 @@ impl Line {
 }
 
 /// Represents a paragraph layout algorithm
-pub trait ParagraphLayout {
+pub trait ParagraphLayout<N: Num = f32> {
     /// Lays out a paragraph with the given line width that consists of as list of items and
     /// returns the laid-out lines.
-    fn layout_paragraph(&self, items: &[Item], line_width: f32) -> Vec<Line>;
+    fn layout_paragraph(&self, items: &[Item<N>], line_width: N) -> Vec<Line<N>>;
 }

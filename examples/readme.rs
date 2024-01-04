@@ -2,17 +2,29 @@ extern crate text_layout;
 use std::fmt::{self, Write};
 use text_layout::{Item, KnuthPlass, ParagraphLayout};
 
-fn layout_paragraph<'a, P: ParagraphLayout>(paragraph: &'a str, layout: &P, max_width: usize) -> Vec<&'a str> {
+fn layout_paragraph<'a, P: ParagraphLayout>(
+    paragraph: &'a str,
+    layout: &P,
+    max_width: usize,
+) -> Vec<&'a str> {
     // Process the paragraph into its items.
     let mut items = Vec::new();
     for c in paragraph.chars() {
         items.push(if c.is_whitespace() && items.len() != 0 {
-            Item::Glue { width: 1.0, stretch: 1.0, shrink: 0.0 }
+            Item::Glue {
+                width: 1.0,
+                stretch: 1.0,
+                shrink: 0.0,
+            }
         } else {
             Item::Box { width: 1.0 }
         });
     }
-    items.push(Item::Penalty { width: 0.0, cost: f32::NEG_INFINITY, flagged: true });
+    items.push(Item::Penalty {
+        width: 0.0,
+        cost: f32::NEG_INFINITY,
+        flagged: true,
+    });
 
     // Calculate the paragraph's breaks.
     let breaks = layout.layout_paragraph(&items, max_width as f32);
@@ -24,7 +36,7 @@ fn layout_paragraph<'a, P: ParagraphLayout>(paragraph: &'a str, layout: &P, max_
     for (i, _) in paragraph.chars().enumerate() {
         if i == breaks[cursor].break_at {
             lines.push(&paragraph[start..i]);
-            start = i+1;
+            start = i + 1;
             cursor += 1;
         }
     }
