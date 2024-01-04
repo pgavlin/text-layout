@@ -1,0 +1,21 @@
+[package]
+name = "text_layout"
+version = "0.1.0"
+authors = ["Pat Gavlin <pgavlin@gmail.com>"]
+edition = "2021"
+description = "Text layout algorithms."
+license = "Apache-2.0"
+keywords = ["text", "layout"]
+categories = ["graphics", "text-processing", "no-std"]
+repository = "https://github.com/pgavlin/text-layout"
+homepage = "https://github.com/pgavlin/text-layout"
+readme = "README.md"
+
+[dependencies]
+bumpalo = "3.14.0"
+libm = { version = "0.2.8", optional = true }
+
+[features]
+default = ["std"]
+std = []
+libm = ["dep:libm"]
