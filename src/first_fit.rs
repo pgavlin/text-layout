@@ -25,6 +25,12 @@ impl<N: Num> FirstFit<N> {
     }
 }
 
+impl<N: Num> Default for FirstFit<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<N: Num> ParagraphLayout<N> for FirstFit<N> {
     fn layout_paragraph(&self, items: &[Item<N>], line_width: N) -> Vec<Line<N>> {
         let l = FirstFitLayout {
