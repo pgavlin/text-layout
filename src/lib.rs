@@ -17,12 +17,14 @@ pub use math::{Fixed, Num};
 
 /// A single item in a paragraph.
 #[derive(Debug)]
-pub enum Item<N = f32> {
+pub enum Item<Box = (), Glue = (), Penalty = (), N = f32> {
     /// An unbreakable box containing paragraph content. Typically represents a glyph or sequence
     /// of glyphs. Lines may not be broken at boxes.
     Box {
         /// The width of the box.
         width: N,
+        /// The box's data.
+        data: Box,
     },
     /// Whitespace that separates boxes. Lines may be broken at glue items.
     Glue {
@@ -34,6 +36,8 @@ pub enum Item<N = f32> {
         /// The shrink parameter. If this item needs to be shrunk in order to lay out a line, the
         /// shrink amount will be proportional to this value.
         shrink: N,
+        /// The glue's data.
+        data: Glue,
     },
     /// A penalty item. Represents a possible breakpoint with a particular aesthetic cost that
     /// indicates the desirability or undesirability of such a breakpoint.
@@ -46,10 +50,12 @@ pub enum Item<N = f32> {
         /// Whether or not this is a flagged penalty item. Some algorithms will attempt to avoid
         /// having multiple consecutive breaks at flagged penalty items.
         flagged: bool,
+        /// The penalty's data.
+        data: Penalty,
     },
 }
 
-impl<N: Num> Item<N> {
+impl<Box, Glue, Penalty, N: Num> Item<Box, Glue, Penalty, N> {
     fn penalty_cost(&self) -> N {
         match self {
             Item::Penalty { cost, .. } => *cost,
@@ -79,13 +85,14 @@ impl<N: Num> Item<N> {
 
     /// Returns the width, stretch, and shrink of the node at b and indicates whether or not b is a
     /// legal break.
-    fn is_legal_breakpoint(&self, pred: Option<&Item<N>>) -> (N, N, N, bool) {
+    fn is_legal_breakpoint(&self, pred: Option<&Self>) -> (N, N, N, bool) {
         match self {
-            Item::Box { width } => (*width, N::from(0), N::from(0), false),
+            Item::Box { width, .. } => (*width, N::from(0), N::from(0), false),
             Item::Glue {
                 width,
                 stretch,
                 shrink,
+                ..
             } => (
                 *width,
                 *stretch,
@@ -151,8 +158,12 @@ impl<N: Num> Line<N> {
 }
 
 /// Represents a paragraph layout algorithm
-pub trait ParagraphLayout<N: Num = f32> {
+pub trait ParagraphLayout<Box = (), Glue = (), Penalty = (), N: Num = f32> {
     /// Lays out a paragraph with the given line width that consists of as list of items and
     /// returns the laid-out lines.
-    fn layout_paragraph(&self, items: &[Item<N>], line_width: N) -> Vec<Line<N>>;
+    fn layout_paragraph(
+        &self,
+        items: &[Item<Box, Glue, Penalty, N>],
+        line_width: N,
+    ) -> Vec<Line<N>>;
 }

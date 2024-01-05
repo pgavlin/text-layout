@@ -62,8 +62,12 @@ impl<N: Num> Default for KnuthPlass<N> {
     }
 }
 
-impl<N: Num> ParagraphLayout<N> for KnuthPlass<N> {
-    fn layout_paragraph(&self, items: &[Item<N>], line_width: N) -> Vec<Line<N>> {
+impl<Box, Glue, Penalty, N: Num> ParagraphLayout<Box, Glue, Penalty, N> for KnuthPlass<N> {
+    fn layout_paragraph(
+        &self,
+        items: &[Item<Box, Glue, Penalty, N>],
+        line_width: N,
+    ) -> Vec<Line<N>> {
         let layout = KnuthPlassLayout {
             bump: Bump::new(),
             items,
@@ -125,12 +129,12 @@ struct Node<N> {
 ///
 /// Active nodes are allocated using a bump allocator and deallocated en masse once the algorithm
 /// terminates.
-struct KnuthPlassLayout<'a, N> {
+struct KnuthPlassLayout<'a, Box, Glue, Penalty, N> {
     /// Allocator for break nodes.
     bump: Bump,
 
     /// The paragraph's items.
-    items: &'a [Item<N>],
+    items: &'a [Item<Box, Glue, Penalty, N>],
     /// The line width parameter.
     line_width: N,
 
@@ -156,7 +160,7 @@ struct KnuthPlassLayout<'a, N> {
     active: Option<*mut Node<N>>,
 }
 
-impl<'a, N: Num> KnuthPlassLayout<'a, N> {
+impl<'a, Box, Glue, Penalty, N: Num> KnuthPlassLayout<'a, Box, Glue, Penalty, N> {
     /// Creates a new node for a breakpoint. Currently just a wrapper for bump.alloc.
     fn new_node(&mut self, node: Node<N>) -> *mut Node<N> {
         self.bump.alloc(node)
@@ -239,6 +243,7 @@ impl<'a, N: Num> KnuthPlassLayout<'a, N> {
                     width,
                     stretch,
                     shrink,
+                    ..
                 } => {
                     total_width += width;
                     total_stretch += stretch;
