@@ -15,20 +15,26 @@ fn layout_paragraph<'a, P: ParagraphLayout>(
                 width: 1.0,
                 stretch: 1.0,
                 shrink: 0.0,
+                data: (),
             }
         } else {
-            Item::Box { width: 1.0 }
+            Item::Box {
+                width: 1.0,
+                data: (),
+            }
         });
     }
     items.push(Item::Glue {
         width: 0.0,
         stretch: 100000.0,
         shrink: 0.0,
+        data: (),
     });
     items.push(Item::Penalty {
         width: 0.0,
         cost: f32::NEG_INFINITY,
         flagged: true,
+        data: (),
     });
 
     // Calculate the paragraph's breaks.

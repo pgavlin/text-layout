@@ -35,15 +35,26 @@ fn layout_paragraph<'a, P: ParagraphLayout>(
                 width: 1.0,
                 stretch: 1.0,
                 shrink: 0.0,
+                data: (),
             }
         } else {
-            Item::Box { width: 1.0 }
+            Item::Box {
+                width: 1.0,
+                data: (),
+            }
         });
     }
+    items.push(Item::Glue {
+        width: 0.0,
+        stretch: 100000.0,
+        shrink: 0.0,
+        data: (),
+    });
     items.push(Item::Penalty {
         width: 0.0,
         cost: f32::NEG_INFINITY,
         flagged: true,
+        data: (),
     });
 
     // Calculate the paragraph's breaks.
@@ -89,9 +100,9 @@ This prints:
 ```console
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃  Far out in the uncharted backwaters of the unfashionable end of the western   ┃
-┃spiral arm of the Galaxy lies a small unregarded yellow sun. Orbiting this      ┃
-┃at a distance of roughly ninety-two million miles is an utterly insignificant   ┃
-┃little blue-green planet whose ape-descended life forms are so amazingly        ┃
-┃primitive that they still think digital watches are a pretty neat idea.         ┃
+┃spiral arm of the Galaxy lies a small unregarded yellow sun. Orbiting this at a ┃
+┃distance of roughly ninety-two million miles is an utterly insignificant little ┃
+┃blue-green planet whose ape-descended life forms are so amazingly primitive that┃
+┃they still think digital watches are a pretty neat idea.                        ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 ```

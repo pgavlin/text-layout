@@ -7,7 +7,7 @@ use text_layout::{Fixed, Item, KnuthPlass, ParagraphLayout};
 
 type F = Fixed<I16F16>;
 
-fn layout_paragraph<'a, P: ParagraphLayout<F>>(
+fn layout_paragraph<'a, P: ParagraphLayout<(), (), (), F>>(
     paragraph: &'a str,
     layout: &P,
     max_width: F,
@@ -20,10 +20,12 @@ fn layout_paragraph<'a, P: ParagraphLayout<F>>(
                 width: F::from_num(1),
                 stretch: F::from_num(1),
                 shrink: F::from_num(0),
+                data: (),
             }
         } else {
             Item::Box {
                 width: F::from_num(1),
+                data: (),
             }
         });
     }
@@ -31,11 +33,13 @@ fn layout_paragraph<'a, P: ParagraphLayout<F>>(
         width: F::from_num(0),
         stretch: F::MAX,
         shrink: F::from_num(0),
+        data: (),
     });
     items.push(Item::Penalty {
         width: F::from_num(0),
         cost: F::MIN,
         flagged: true,
+        data: (),
     });
 
     // Calculate the paragraph's breaks.

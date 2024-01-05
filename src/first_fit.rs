@@ -31,8 +31,12 @@ impl<N: Num> Default for FirstFit<N> {
     }
 }
 
-impl<N: Num> ParagraphLayout<N> for FirstFit<N> {
-    fn layout_paragraph(&self, items: &[Item<N>], line_width: N) -> Vec<Line<N>> {
+impl<Box, Glue, Penalty, N: Num> ParagraphLayout<Box, Glue, Penalty, N> for FirstFit<N> {
+    fn layout_paragraph(
+        &self,
+        items: &[Item<Box, Glue, Penalty, N>],
+        line_width: N,
+    ) -> Vec<Line<N>> {
         let l = FirstFitLayout {
             line_width,
             threshold: self.threshold,
@@ -78,7 +82,10 @@ impl<N: Num> FirstFitLayout<N> {
         self.shrink -= b.shrink;
     }
 
-    fn layout_paragraph(mut self, items: &[Item<N>]) -> Vec<Line<N>> {
+    fn layout_paragraph<Box, Glue, Penalty>(
+        mut self,
+        items: &[Item<Box, Glue, Penalty, N>],
+    ) -> Vec<Line<N>> {
         let mut last_breakpoint: Option<Break<N>> = None;
         for (b, item) in items.iter().enumerate() {
             let (width, stretch, shrink, is_legal) =
