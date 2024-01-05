@@ -7,9 +7,9 @@
 [![Apache licensed][apache-badge]][apache-url]
 
 [crates-badge]: https://img.shields.io/crates/v/text-layout.svg
-[crates-url]: https://crates.io/crates/text-layout
-[docs-badge]: https://docs.rs/text-layout/badge.svg
-[docs-url]: https://docs.rs/text-layout
+[crates-url]: https://crates.io/crates/text_layout
+[docs-badge]: https://docs.rs/text_layout/badge.svg
+[docs-url]: https://docs.rs/text_layout
 [apache-badge]: https://img.shields.io/badge/license-Apache--2.0-blue.svg
 [apache-url]: LICENSE
 
