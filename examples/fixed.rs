@@ -27,6 +27,11 @@ fn layout_paragraph<'a, P: ParagraphLayout<F>>(
             }
         });
     }
+    items.push(Item::Glue {
+        width: F::from_num(0),
+        stretch: F::MAX,
+        shrink: F::from_num(0),
+    });
     items.push(Item::Penalty {
         width: F::from_num(0),
         cost: F::MIN,
@@ -78,10 +83,10 @@ mod tests {
     fn fixed() {
         let expected = r#"┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃  Far out in the uncharted backwaters of the unfashionable end of the western   ┃
-┃spiral arm of the Galaxy lies a small unregarded yellow sun. Orbiting this      ┃
-┃at a distance of roughly ninety-two million miles is an utterly insignificant   ┃
-┃little blue-green planet whose ape-descended life forms are so amazingly        ┃
-┃primitive that they still think digital watches are a pretty neat idea.         ┃
+┃spiral arm of the Galaxy lies a small unregarded yellow sun. Orbiting this at a ┃
+┃distance of roughly ninety-two million miles is an utterly insignificant little ┃
+┃blue-green planet whose ape-descended life forms are so amazingly primitive that┃
+┃they still think digital watches are a pretty neat idea.                        ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 "#;
         let actual = layout_text().unwrap();

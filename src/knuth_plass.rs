@@ -385,28 +385,36 @@ impl<'a, N: Num> KnuthPlassLayout<'a, N> {
         let mut lines = vec![Default::default(); b.line];
         let mut j = b.line;
         while j > 0 {
-            let (prev_width, prev_stretch, prev_shrink) = match b.previous {
-                None => Default::default(),
-                Some(p) => ((*p).total_width, (*p).total_stretch, (*p).total_shrink),
-            };
+            let prev = &*b.previous.unwrap();
+            let prev_pos = if j == 1 { 0 } else { prev.position + 1 };
+
+            let items = &self.items[prev_pos..b.position];
+            let (width, stretch, shrink) = items
+                .iter()
+                .map(|item| match item {
+                    Item::Box { width, .. } => (*width, N::from(0), N::from(0)),
+                    Item::Glue {
+                        width,
+                        stretch,
+                        shrink,
+                        ..
+                    } => (*width, *stretch, *shrink),
+                    Item::Penalty { width, .. } => (*width, N::from(0), N::from(0)),
+                })
+                .reduce(|acc, n| (acc.0 + n.0, acc.1 + n.1, acc.2 + n.2))
+                .unwrap();
 
             let at = &self.items[b.position];
-            let width = b.total_width - prev_width;
-            let stretch = b.total_stretch - prev_stretch;
-            let shrink = b.total_shrink - prev_shrink;
             let line_width = self.get_line_width(j);
+            let adjustment_ratio = at.adjustment_ratio(width, stretch, shrink, line_width);
+
             lines[j - 1] = Line {
                 break_at: b.position,
-                adjustment_ratio: at.adjustment_ratio(width, stretch, shrink, line_width),
+                adjustment_ratio,
             };
 
-            match b.previous {
-                None => break,
-                Some(p) => {
-                    b = &*p;
-                    j -= 1;
-                }
-            };
+            b = prev;
+            j -= 1;
         }
 
         lines

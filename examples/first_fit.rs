@@ -20,6 +20,11 @@ fn layout_paragraph<'a, P: ParagraphLayout>(
             Item::Box { width: 1.0 }
         });
     }
+    items.push(Item::Glue {
+        width: 0.0,
+        stretch: 100000.0,
+        shrink: 0.0,
+    });
     items.push(Item::Penalty {
         width: 0.0,
         cost: f32::NEG_INFINITY,
