@@ -6,6 +6,9 @@ compile_error! { "Either the std, fixed, or libm feature must be enabled" }
 extern crate alloc;
 use alloc::vec::Vec;
 
+mod first_fit;
+pub use first_fit::*;
+
 mod knuth_plass;
 pub use knuth_plass::*;
 
@@ -71,6 +74,53 @@ impl<N: Num> Item<N> {
         match self {
             Item::Penalty { cost, .. } => *cost == N::NEG_INFINITY,
             _ => false,
+        }
+    }
+
+    /// Returns the width, stretch, and shrink of the node at b and indicates whether or not b is a
+    /// legal break.
+    fn is_legal_breakpoint(&self, pred: Option<&Item<N>>) -> (N, N, N, bool) {
+        match self {
+            Item::Box { width } => (*width, N::from(0), N::from(0), false),
+            Item::Glue {
+                width,
+                stretch,
+                shrink,
+            } => (
+                *width,
+                *stretch,
+                *shrink,
+                matches!(pred, Some(Item::Box { .. })),
+            ),
+            Item::Penalty { width, cost, .. } => {
+                (*width, N::from(0), N::from(0), *cost != N::INFINITY)
+            }
+        }
+    }
+
+    /// Calculates the adjustment ratio for a break at the given item. Width, stretch, and shrink
+    /// are for the line that ends at the break.
+    fn adjustment_ratio(&self, width: N, stretch: N, shrink: N, line_width: N) -> N {
+        let penalty_width = if let Item::Penalty { width, .. } = self {
+            *width
+        } else {
+            N::from(0)
+        };
+        let width = width + penalty_width;
+        if width < line_width {
+            if stretch > N::from(0) {
+                (line_width - width) / stretch
+            } else {
+                N::INFINITY
+            }
+        } else if width > line_width {
+            if shrink > N::from(0) {
+                (line_width - width) / shrink
+            } else {
+                N::NEG_INFINITY
+            }
+        } else {
+            N::from(0)
         }
     }
 }

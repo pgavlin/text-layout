@@ -1,6 +1,6 @@
 use core::cmp::{Ordering, PartialOrd};
 use core::fmt::{self, Debug};
-use core::ops::{Add, AddAssign, Div, Mul, Sub};
+use core::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 use fixed::traits::{FixedSigned, ToFixed};
 
 /// A trait that describes the operations necessary for this crate's layout algorithms.
@@ -13,6 +13,7 @@ where
         + Add<Output = Self>
         + AddAssign
         + Sub<Output = Self>
+        + SubAssign
         + Mul<Output = Self>
         + Div<Output = Self>,
 {
@@ -106,6 +107,12 @@ impl<F: FixedSigned> Sub for Fixed<F> {
 
     fn sub(self, rhs: Self) -> Self {
         Fixed(self.0.saturating_sub(rhs.0))
+    }
+}
+
+impl<F: FixedSigned> SubAssign for Fixed<F> {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
     }
 }
 

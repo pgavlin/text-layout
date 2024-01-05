@@ -5,7 +5,7 @@ use bumpalo::Bump;
 use crate::math::Num;
 use crate::{Item, Line, ParagraphLayout};
 
-/// Runs the Kunth-Plass line-breaking algorithm to calculate the optimal break points for a
+/// Runs the Knuth-Plass line-breaking algorithm to calculate the optimal break points for a
 /// paragraph.
 pub struct KnuthPlass<N> {
     flagged_demerit: N,
@@ -15,7 +15,7 @@ pub struct KnuthPlass<N> {
 }
 
 impl<N: Num> KnuthPlass<N> {
-    /// Creates a new with default parameter values.
+    /// Creates a new KnuthPlass layout with default parameter values.
     pub fn new() -> Self {
         KnuthPlass {
             flagged_demerit: N::from(100),
@@ -25,7 +25,7 @@ impl<N: Num> KnuthPlass<N> {
         }
     }
 
-    /// Sets the demerit for flagged penalties. Defaults to 100. Referred to as 𝛂 in Kunth-Plass
+    /// Sets the demerit for flagged penalties. Defaults to 100. Referred to as 𝛂 in Knuth-Plass
     /// '81.
     pub fn with_flagged_demerit(mut self, flagged_demerit: N) -> Self {
         self.flagged_demerit = flagged_demerit;
@@ -40,8 +40,8 @@ impl<N: Num> KnuthPlass<N> {
     }
 
     /// Sets the adjustment ratio threshold. Lines will not be allowed to break at a given point if
-    /// doing so would cause the line's adjustment ratio to exceed this value. Referred to as 𝛒 in
-    /// Knuth-Plass '81.
+    /// doing so would cause the line's adjustment ratio to exceed this value. Defaults to 1.
+    /// Referred to as 𝛒 in Knuth-Plass '81.
     pub fn with_threshold(mut self, threshold: N) -> Self {
         self.threshold = threshold;
         self
@@ -79,32 +79,6 @@ impl<N: Num> ParagraphLayout<N> for KnuthPlass<N> {
             active: None,
         };
         unsafe { layout.run() }
-    }
-}
-
-/// Calculates the adjustment ratio for a break at the given item. Width, stretch, and shrink
-/// are for the line that ends at the break.
-fn adjustment_ratio<N: Num>(at: &Item<N>, width: N, stretch: N, shrink: N, line_width: N) -> N {
-    let penalty_width = if let Item::Penalty { width, .. } = at {
-        *width
-    } else {
-        N::from(0)
-    };
-    let width = width + penalty_width;
-    if width < line_width {
-        if stretch > N::from(0) {
-            (line_width - width) / stretch
-        } else {
-            N::INFINITY
-        }
-    } else if width > line_width {
-        if shrink > N::from(0) {
-            (line_width - width) / shrink
-        } else {
-            N::INFINITY
-        }
-    } else {
-        N::from(0)
     }
 }
 
@@ -160,16 +134,16 @@ struct KnuthPlassLayout<'a, N> {
     /// The line width parameter.
     line_width: N,
 
-    /// Demerit for flagged penalties. Referred to as 𝛂 in Kunth-Plass '81.
+    /// Demerit for flagged penalties. Referred to as 𝛂 in Knuth-Plass '81.
     flagged_demerit: N,
     /// Demerit for differing fitness classes. Referred to as 𝛄 in Knuth-Plass '81.
     fitness_demerit: N,
     /// Adjustment ratio threshold.  Referred to as 𝛒 in Knuth-Plass '81.
     threshold: N,
-    /// Looseness parameter. Referred to as 𝗾 in Kunth-Plass '81.
+    /// Looseness parameter. Referred to as 𝗾 in Knuth-Plass '81.
     looseness: usize,
     /// Index of the first line that begins a block of uniformly-long lines that extends to the end
-    /// of the paragraph. 𝒿₀ in Kunth-Plass '81.
+    /// of the paragraph. 𝒿₀ in Knuth-Plass '81.
     first_uniform_line: usize,
 
     /// Total width of all items in the paragraph up to the current item.
@@ -197,29 +171,13 @@ impl<'a, N: Num> KnuthPlassLayout<'a, N> {
     /// Returns the width, stretch, and shrink of the node at b and indicates whether or not b is a
     /// legal break.
     fn is_legal_breakpoint(&self, b: usize) -> (N, N, N, bool) {
-        match self.items[b] {
-            Item::Box { width } => (width, N::from(0), N::from(0), false),
-            Item::Glue {
-                width,
-                stretch,
-                shrink,
-            } => (
-                width,
-                stretch,
-                shrink,
-                matches!(self.items[b - 1], Item::Box { .. }),
-            ),
-            Item::Penalty { width, cost, .. } => {
-                (width, N::from(0), N::from(0), cost != N::INFINITY)
-            }
-        }
+        self.items[b].is_legal_breakpoint((b != 0).then(|| &self.items[b - 1]))
     }
 
     /// Calculates the line number and adjustment ratio for a line from the end of a to b.
     fn adjustment_ratio(&self, a: &Node<N>, b: usize) -> (usize, N) {
         let j = a.line + 1;
-        let r = adjustment_ratio(
-            &self.items[b],
+        let r = self.items[b].adjustment_ratio(
             self.total_width - a.total_width,
             self.total_stretch - a.total_stretch,
             self.total_shrink - a.total_shrink,
@@ -439,7 +397,7 @@ impl<'a, N: Num> KnuthPlassLayout<'a, N> {
             let line_width = self.get_line_width(j);
             lines[j - 1] = Line {
                 break_at: b.position,
-                adjustment_ratio: adjustment_ratio(at, width, stretch, shrink, line_width),
+                adjustment_ratio: at.adjustment_ratio(width, stretch, shrink, line_width),
             };
 
             match b.previous {
