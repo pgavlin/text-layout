@@ -7,6 +7,7 @@ use crate::{Item, Line, ParagraphLayout};
 /// Runs the first-fit line-breaking algorithm to calculate the break points for a paragraph.
 pub struct FirstFit<N> {
     threshold: N,
+    allow_overflow: bool,
 }
 
 impl<N: Num> FirstFit<N> {
@@ -14,6 +15,7 @@ impl<N: Num> FirstFit<N> {
     pub fn new() -> Self {
         FirstFit {
             threshold: N::from(1),
+            allow_overflow: false,
         }
     }
 
@@ -21,6 +23,13 @@ impl<N: Num> FirstFit<N> {
     /// doing so would cause the line's adjustment ratio to exceed this value. Defaults to 1.
     pub fn with_threshold(mut self, threshold: N) -> Self {
         self.threshold = threshold;
+        self
+    }
+
+    /// Configures the layout to allow lines that exceed the maximum line with if the layout would
+    /// fail otherwise.
+    pub fn allow_overflow(mut self, allow_overflow: bool) -> Self {
+        self.allow_overflow = allow_overflow;
         self
     }
 }
@@ -40,6 +49,7 @@ impl<Box, Glue, Penalty, N: Num> ParagraphLayout<Box, Glue, Penalty, N> for Firs
         let l = FirstFitLayout {
             line_width,
             threshold: self.threshold,
+            allow_overflow: self.allow_overflow,
             width: N::from(0),
             stretch: N::from(0),
             shrink: N::from(0),
@@ -62,6 +72,7 @@ struct FirstFitLayout<N: Num> {
     line_width: N,
 
     threshold: N,
+    allow_overflow: bool,
 
     width: N,
     stretch: N,
@@ -104,7 +115,16 @@ impl<N: Num> FirstFitLayout<N> {
 
                 let adjustment_ratio =
                     item.adjustment_ratio(self.width, self.stretch, self.shrink, self.line_width);
-                if adjustment_ratio < N::from(-1) || adjustment_ratio > self.threshold {
+
+                let adjustment_ratio = if adjustment_ratio < N::from(-1) {
+                    if !self.allow_overflow {
+                        return Vec::new();
+                    }
+                    N::from(0)
+                } else {
+                    adjustment_ratio
+                };
+                if adjustment_ratio > self.threshold {
                     return Vec::new();
                 }
 
