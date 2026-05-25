@@ -363,16 +363,17 @@ impl<'a, Box, Glue, Penalty, N: Num> KnuthPlassLayout<'a, Box, Glue, Penalty, N>
             };
         }
 
-        // Choose the appropriate active node.
+        // Choose the appropriate active node, preferring one whose line count differs
+        // from the optimum by as close to the looseness as possible.
         if self.looseness != 0 {
-            let k = b.line;
+            let k = b.line as isize;
+            let looseness = self.looseness as isize;
 
             let mut a = &*self.active.unwrap();
-            let mut b = a;
-            let mut s = 0;
+            let mut s = 0isize;
             loop {
-                let delta = a.line - k;
-                if self.looseness <= delta && delta < s || s < delta && delta <= self.looseness {
+                let delta = a.line as isize - k;
+                if looseness <= delta && delta < s || s < delta && delta <= looseness {
                     s = delta;
                     b = a;
                 } else if delta == s && a.total_demerits < b.total_demerits {
