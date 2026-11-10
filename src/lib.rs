@@ -157,13 +157,54 @@ impl<N: Num> Line<N> {
     }
 }
 
+/// A capability to retrieve line widths for a paragraph.
+pub trait LineWidths<N: Num = f32> {
+    /// Returns the width of the line at the given index.
+    fn line_width(&self, line: usize) -> N;
+
+    /// Returns the index of the first line of uniform width, if any. This line and each line
+    /// after it are of the same width.
+    fn uniform_at(&self) -> Option<usize> {
+        None
+    }
+}
+
+/// An implementation of LineWidth for paragraphs with a uniform line width.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct UniformLineWidth<N: Num = f32> {
+    width: N,
+}
+
+impl<N: Num> From<N> for UniformLineWidth<N> {
+    fn from(value: N) -> Self {
+        Self { width: value }
+    }
+}
+
+impl<N: Num> LineWidths<N> for UniformLineWidth<N> {
+    fn line_width(&self, _: usize) -> N {
+        self.width
+    }
+
+    fn uniform_at(&self) -> Option<usize> {
+        Some(0)
+    }
+}
+
 /// Represents a paragraph layout algorithm
-pub trait ParagraphLayout<Box = (), Glue = (), Penalty = (), N: Num = f32> {
+pub trait ParagraphLayout<
+    Box = (),
+    Glue = (),
+    Penalty = (),
+    N: Num = f32,
+    LineWidths = UniformLineWidth<N>,
+>
+{
     /// Lays out a paragraph with the given line width that consists of as list of items and
     /// returns the laid-out lines.
     fn layout_paragraph(
         &self,
         items: &[Item<Box, Glue, Penalty, N>],
-        line_width: N,
+        line_widths: LineWidths,
     ) -> Vec<Line<N>>;
 }

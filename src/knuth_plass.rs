@@ -3,7 +3,7 @@ use alloc::{vec, vec::Vec};
 use bumpalo::Bump;
 
 use crate::math::Num;
-use crate::{Item, Line, ParagraphLayout};
+use crate::{Item, Line, LineWidths, ParagraphLayout};
 
 /// Runs the Knuth-Plass line-breaking algorithm to calculate the optimal break points for a
 /// paragraph.
@@ -62,21 +62,24 @@ impl<N: Num> Default for KnuthPlass<N> {
     }
 }
 
-impl<Box, Glue, Penalty, N: Num> ParagraphLayout<Box, Glue, Penalty, N> for KnuthPlass<N> {
+impl<Box, Glue, Penalty, N: Num, L: LineWidths<N>> ParagraphLayout<Box, Glue, Penalty, N, L>
+    for KnuthPlass<N>
+{
     fn layout_paragraph(
         &self,
         items: &[Item<Box, Glue, Penalty, N>],
-        line_width: N,
+        line_widths: L,
     ) -> Vec<Line<N>> {
+        let first_uniform_line = line_widths.uniform_at().map(|i| i + 1);
         let layout = KnuthPlassLayout {
             bump: Bump::new(),
             items,
-            line_width,
+            line_widths,
             flagged_demerit: self.flagged_demerit,
             fitness_demerit: self.fitness_demerit,
             threshold: self.threshold,
             looseness: self.looseness,
-            first_uniform_line: 0,
+            first_uniform_line,
             total_width: N::from(0),
             total_stretch: N::from(0),
             total_shrink: N::from(0),
@@ -129,14 +132,14 @@ struct Node<N> {
 ///
 /// Active nodes are allocated using a bump allocator and deallocated en masse once the algorithm
 /// terminates.
-struct KnuthPlassLayout<'a, Box, Glue, Penalty, N> {
+struct KnuthPlassLayout<'a, Box, Glue, Penalty, N, L> {
     /// Allocator for break nodes.
     bump: Bump,
 
     /// The paragraph's items.
     items: &'a [Item<Box, Glue, Penalty, N>],
-    /// The line width parameter.
-    line_width: N,
+    /// The line width capability.
+    line_widths: L,
 
     /// Demerit for flagged penalties. Referred to as 𝛂 in Knuth-Plass '81.
     flagged_demerit: N,
@@ -148,7 +151,7 @@ struct KnuthPlassLayout<'a, Box, Glue, Penalty, N> {
     looseness: usize,
     /// Index of the first line that begins a block of uniformly-long lines that extends to the end
     /// of the paragraph. 𝒿₀ in Knuth-Plass '81.
-    first_uniform_line: usize,
+    first_uniform_line: Option<usize>,
 
     /// Total width of all items in the paragraph up to the current item.
     total_width: N,
@@ -160,16 +163,17 @@ struct KnuthPlassLayout<'a, Box, Glue, Penalty, N> {
     active: Option<*mut Node<N>>,
 }
 
-impl<'a, Box, Glue, Penalty, N: Num> KnuthPlassLayout<'a, Box, Glue, Penalty, N> {
+impl<'a, Box, Glue, Penalty, N: Num, L: LineWidths<N>>
+    KnuthPlassLayout<'a, Box, Glue, Penalty, N, L>
+{
     /// Creates a new node for a breakpoint. Currently just a wrapper for bump.alloc.
     fn new_node(&mut self, node: Node<N>) -> *mut Node<N> {
         self.bump.alloc(node)
     }
 
-    /// Placeholder method for determining the width of a given line. Currently just returns
-    /// line_width.
-    fn get_line_width(&self, _l: usize) -> N {
-        self.line_width
+    /// Determines the width of a given line.
+    fn get_line_width(&self, l: usize) -> N {
+        self.line_widths.line_width(l - 1)
     }
 
     /// Returns the width, stretch, and shrink of the node at b and indicates whether or not b is a
@@ -292,7 +296,11 @@ impl<'a, Box, Glue, Penalty, N: Num> KnuthPlassLayout<'a, Box, Glue, Penalty, N>
                 match a {
                     None => break,
                     Some(a) => {
-                        if (*a).line >= j && j < self.first_uniform_line {
+                        let before_first_uniform_line = match self.first_uniform_line {
+                            None => true,
+                            Some(i) => j < i,
+                        };
+                        if (*a).line >= j && before_first_uniform_line {
                             break;
                         }
                     }

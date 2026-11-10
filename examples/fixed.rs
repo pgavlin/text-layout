@@ -43,7 +43,7 @@ fn layout_paragraph<'a, P: ParagraphLayout<(), (), (), F>>(
     });
 
     // Calculate the paragraph's breaks.
-    let breaks = layout.layout_paragraph(&items, max_width);
+    let breaks = layout.layout_paragraph(&items, max_width.into());
 
     // Render the laid-out paragraph using the break positions.
     let mut cursor = 0;

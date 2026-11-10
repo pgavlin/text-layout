@@ -2,7 +2,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use crate::math::Num;
-use crate::{Item, Line, ParagraphLayout};
+use crate::{Item, Line, LineWidths, ParagraphLayout};
 
 /// Runs the first-fit line-breaking algorithm to calculate the break points for a paragraph.
 pub struct FirstFit<N> {
@@ -40,14 +40,18 @@ impl<N: Num> Default for FirstFit<N> {
     }
 }
 
-impl<Box, Glue, Penalty, N: Num> ParagraphLayout<Box, Glue, Penalty, N> for FirstFit<N> {
+impl<Box, Glue, Penalty, N: Num, L: LineWidths<N>> ParagraphLayout<Box, Glue, Penalty, N, L>
+    for FirstFit<N>
+{
     fn layout_paragraph(
         &self,
         items: &[Item<Box, Glue, Penalty, N>],
-        line_width: N,
+        line_widths: L,
     ) -> Vec<Line<N>> {
+        let first_line_width = line_widths.line_width(0);
         let l = FirstFitLayout {
-            line_width,
+            line_widths,
+            line_width: first_line_width,
             threshold: self.threshold,
             allow_overflow: self.allow_overflow,
             width: N::from(0),
@@ -68,7 +72,8 @@ struct Break<N> {
     at: usize,
 }
 
-struct FirstFitLayout<N: Num> {
+struct FirstFitLayout<N: Num, L: LineWidths<N>> {
+    line_widths: L,
     line_width: N,
 
     threshold: N,
@@ -81,12 +86,13 @@ struct FirstFitLayout<N: Num> {
     lines: Vec<Line<N>>,
 }
 
-impl<N: Num> FirstFitLayout<N> {
+impl<N: Num, L: LineWidths<N>> FirstFitLayout<N, L> {
     fn break_at(&mut self, b: Break<N>) {
         self.lines.push(Line {
             break_at: b.at,
             adjustment_ratio: b.adjustment_ratio,
         });
+        self.line_width = self.line_widths.line_width(self.lines.len());
 
         self.width -= b.width;
         self.stretch -= b.stretch;
